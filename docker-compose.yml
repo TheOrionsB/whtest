@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   webhook-tester:
-    build: .
+    build: 
+      context: .
+      network: host
     ports:
       - "3000:3000"
     environment:
