@@ -1,6 +1,9 @@
 # Use Node.js 18 LTS as base image
 FROM node:18-alpine
 
+# Install yarn globally
+RUN npm install -g yarn
+
 # Set working directory
 WORKDIR /app
 
