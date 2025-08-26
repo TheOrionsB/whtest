@@ -1,7 +1,5 @@
-# Use Node.js 18 LTS as base image
+# Use Node.js 24 LTS as base image
 FROM node:24-alpine3.21
-
-RUN apk update && apk upgrade
 
 # Set working directory
 WORKDIR /app
