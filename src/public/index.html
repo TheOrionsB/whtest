@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Tester</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .status {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .log-container {
+            padding: 30px;
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .log-header h2 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .log-count {
+            background: #007bff;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .log-box {
+            background: #1e1e1e;
+            color: #f8f8f2;
+            border-radius: 10px;
+            padding: 20px;
+            height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            border: 1px solid #333;
+        }
+
+        .log-entry {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #2d2d2d;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-timestamp {
+            color: #66d9ef;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .log-method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 12px;
+        }
+
+        .method-GET { background: #4CAF50; color: white; }
+        .method-POST { background: #2196F3; color: white; }
+        .method-PUT { background: #FF9800; color: white; }
+        .method-DELETE { background: #f44336; color: white; }
+        .method-PATCH { background: #9C27B0; color: white; }
+
+        .log-url {
+            color: #a6e22e;
+            font-weight: bold;
+        }
+
+        .log-details {
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .log-section {
+            margin-bottom: 8px;
+        }
+
+        .log-label {
+            color: #f92672;
+            font-weight: bold;
+        }
+
+        .log-value {
+            color: #e6db74;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #666;
+            padding: 60px 20px;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .webhook-url {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #007bff;
+        }
+
+        .webhook-url h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .url-example {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            color: #495057;
+            border: 1px solid #dee2e6;
+        }
+
+        .log-box::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-box::-webkit-scrollbar-track {
+            background: #333;
+        }
+
+        .log-box::-webkit-scrollbar-thumb {
+            background: #666;
+            border-radius: 4px;
+        }
+
+        .log-box::-webkit-scrollbar-thumb:hover {
+            background: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 Webhook Tester</h1>
+            <p>Real-time webhook monitoring and debugging tool</p>
+        </div>
+
+        <div class="status">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="connectionStatus">Connecting...</span>
+            </div>
+            <div>
+                <span>Server: </span>
+                <strong id="serverUrl">http://localhost:3000</strong>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-danger" onclick="clearLogs()">Clear Logs</button>
+            <button class="btn btn-primary" onclick="testWebhook()">Send Test Webhook</button>
+        </div>
+
+        <div class="log-container">
+            <div class="log-header">
+                <h2>📊 Webhook Logs</h2>
+                <span class="log-count" id="logCount">0 requests</span>
+            </div>
+            
+            <div class="log-box" id="logBox">
+                <div class="empty-state">
+                    <div style="font-size: 3rem; margin-bottom: 20px;">📡</div>
+                    <h3>Waiting for webhooks...</h3>
+                    <p>Send a request to any endpoint to see it logged here in real-time</p>
+                </div>
+            </div>
+
+            <div class="webhook-url">
+                <h3>📍 Test Your Webhooks</h3>
+                <p>Send requests to any path on this server to test webhooks:</p>
+                <div class="url-example" id="exampleUrl">
+                    http://localhost:3000/webhook/test<br>
+                    http://localhost:3000/api/payment<br>
+                    http://localhost:3000/any/path/you/want
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let logCount = 0;
+        const socket = io();
+        const logBox = document.getElementById('logBox');
+        const statusDot = document.getElementById('statusDot');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const logCountElement = document.getElementById('logCount');
+        const serverUrl = document.getElementById('serverUrl');
+        const exampleUrl = document.getElementById('exampleUrl');
+
+        // Update server URL based on current location
+        const currentUrl = window.location.origin;
+        serverUrl.textContent = currentUrl;
+        exampleUrl.innerHTML = `
+            ${currentUrl}/webhook/test<br>
+            ${currentUrl}/api/payment<br>
+            ${currentUrl}/any/path/you/want
+        `;
+
+        // Socket connection events
+        socket.on('connect', () => {
+            statusDot.classList.add('connected');
+            connectionStatus.textContent = 'Connected';
+        });
+
+        socket.on('disconnect', () => {
+            statusDot.classList.remove('connected');
+            connectionStatus.textContent = 'Disconnected';
+        });
+
+        // Listen for webhook logs
+        socket.on('webhook-log', (data) => {
+            addLogEntry(data);
+        });
+
+        function addLogEntry(data) {
+            // Remove empty state if it exists
+            const emptyState = logBox.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            logCount++;
+            updateLogCount();
+
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            const timestamp = new Date(data.timestamp).toLocaleString();
+            const method = data.method || 'UNKNOWN';
+            const url = data.url || '/';
+            
+            let queryString = '';
+            if (data.query && Object.keys(data.query).length > 0) {
+                queryString = JSON.stringify(data.query, null, 2);
+            }
+            
+            let bodyString = '';
+            if (data.body) {
+                if (typeof data.body === 'string') {
+                    bodyString = data.body;
+                } else {
+                    bodyString = JSON.stringify(data.body, null, 2);
+                }
+            }
+
+            let headersString = '';
+            if (data.headers && Object.keys(data.headers).length > 0) {
+                const filteredHeaders = {};
+                Object.keys(data.headers).forEach(key => {
+                    if (!key.startsWith('x-') && key !== 'host' && key !== 'connection') {
+                        filteredHeaders[key] = data.headers[key];
+                    }
+                });
+                if (Object.keys(filteredHeaders).length > 0) {
+                    headersString = JSON.stringify(filteredHeaders, null, 2);
+                }
+            }
+
+            logEntry.innerHTML = `
+                <div class="log-timestamp">${timestamp}</div>
+                <div>
+                    <span class="log-method method-${method}">${method}</span>
+                    <span class="log-url">${url}</span>
+                </div>
+                <div class="log-details">
+                    ${queryString ? `<div class="log-section"><span class="log-label">Query:</span><br><span class="log-value">${queryString}</span></div>` : ''}
+                    ${bodyString ? `<div class="log-section"><span class="log-label">Body:</span><br><span class="log-value">${bodyString}</span></div>` : ''}
+                    ${headersString ? `<div class="log-section"><span class="log-label">Headers:</span><br><span class="log-value">${headersString}</span></div>` : ''}
+                    ${data.userAgent ? `<div class="log-section"><span class="log-label">User-Agent:</span><br><span class="log-value">${data.userAgent}</span></div>` : ''}
+                </div>
+            `;
+
+            logBox.insertBefore(logEntry, logBox.firstChild);
+            
+            // Keep only last 100 entries to prevent memory issues
+            const entries = logBox.querySelectorAll('.log-entry');
+            if (entries.length > 100) {
+                entries[entries.length - 1].remove();
+            }
+        }
+
+        function updateLogCount() {
+            logCountElement.textContent = `${logCount} request${logCount !== 1 ? 's' : ''}`;
+        }
+
+        function clearLogs() {
+            logBox.innerHTML = `
+                <div class="empty-state">
+                    <div style="font-size: 3rem; margin-bottom: 20px;">📡</div>
+                    <h3>Waiting for webhooks...</h3>
+                    <p>Send a request to any endpoint to see it logged here in real-time</p>
+                </div>
+            `;
+            logCount = 0;
+            updateLogCount();
+        }
+
+        function testWebhook() {
+            fetch('/test/webhook', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    test: true,
+                    message: 'This is a test webhook',
+                    timestamp: new Date().toISOString(),
+                    data: {
+                        user_id: 12345,
+                        action: 'test_webhook',
+                        metadata: {
+                            source: 'frontend_test_button'
+                        }
+                    }
+                })
+            }).catch(err => console.error('Test webhook failed:', err));
+        }
+    </script>
+</body>
+</html>
