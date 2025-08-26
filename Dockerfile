@@ -1,23 +1,22 @@
 # Use Node.js 18 LTS as base image
 FROM node:18-alpine
 
-# Install yarn globally
-RUN npm install -g yarn
+RUN apk update && apk upgrade
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package.json yarn.lock* ./
+COPY package.json ./
 
-# Install dependencies
-RUN yarn install --frozen-lockfile
+# Install all dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN yarn build
+RUN npm run build
 
 # Expose port 3000
 EXPOSE 3000
@@ -26,4 +25,4 @@ EXPOSE 3000
 ENV NODE_ENV=production
 
 # Start the application
-CMD ["yarn", "start"]
+CMD ["npm", "start"]
