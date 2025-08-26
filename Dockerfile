@@ -9,13 +9,16 @@ COPY package.json ./
 COPY package-lock.json ./
 
 # Install all dependencies (including dev dependencies for build)
-RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build the application
 RUN npm run build
+
+# Remove dev dependencies to reduce image size
+RUN npm ci --only=production && npm cache clean --force
 
 # Expose port 3000
 EXPOSE 3000
